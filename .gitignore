@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.py[cod]
+build/
+dist/
+.pytest_cache/
+*.log
+.env
+.env.*
+!.env.example
+*.private
+*signing-key*
+*.pfx
+*.p12
+*.pem
+*.rar
+*.zip
+Updates/
+Installer Files/

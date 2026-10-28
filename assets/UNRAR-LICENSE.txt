@@ -1,0 +1,16 @@
+UnRAR - Free utility for RAR archives
+License for use and distribution of the free portable version
+
+The source code of the UnRAR utility is freeware. This means:
+
+1. All copyrights to RAR and the UnRAR utility are exclusively owned by Alexander L. Roshal.
+
+2. UnRAR sources may be used in software to handle RAR archives without limitations and free of charge, but may not be used to recreate the proprietary RAR compression algorithm. Modified UnRAR sources may be distributed if documentation and source comments clearly state that the code may not be used to develop a RAR (WinRAR) compatible archiver.
+
+3. The UnRAR utility may be freely distributed, including inside other software packages.
+
+4. The RAR archiver and UnRAR utility are provided "AS IS", without warranty. The author is not liable for data loss, damages, loss of profits, or other loss from using or misusing this software.
+
+5. Installing and using the UnRAR utility signifies acceptance of these terms. If you do not agree, remove the UnRAR files and stop using the utility.
+
+Alexander L. Roshal
