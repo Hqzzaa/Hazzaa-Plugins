@@ -17,6 +17,7 @@ Windows desktop tool for installing and organizing After Effects plug-ins, scrip
 - Collect user presets, back up supported registry changes and remove recorded installations.
 - Customize the startup image with pan, zoom, multiline text, fonts and colors.
 - Download signed application updates with file verification and rollback.
+- Repair incomplete FilmConvert Nitrate 3.56 support resources after setup and on application startup.
 
 ## Use
 

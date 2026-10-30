@@ -148,6 +148,10 @@ def verify_known_setup_outputs(installer,shared_root=None):
         outputs=list((shared/'BAO').rglob('*.aex'))
     elif name=='nitrate.pp-3.56b.exe':
         outputs=[p for p in shared.rglob('*.aex') if 'nitrate' in str(p.relative_to(shared)).casefold()]
+        from filmconvert_runtime import runtime_plan
+        _, required = runtime_plan()
+        if any(not path.is_file() or not path.stat().st_size for path in required):
+            raise OSError('FilmConvert Nitrate support files are missing from ProgramData. Its AEX alone is not a complete installation.')
     else:
         return None
     if not outputs or any(not p.is_file() or p.stat().st_size==0 for p in outputs):

@@ -1,15 +1,19 @@
-# Validation
+# Hazzaa Plugins 2026.10.30.1
 
-Version: **2026.10.28.5**
+## FilmConvert Nitrate fix
 
-Checked on Windows with Python 3.14.0, Pillow 12.2.0, rarfile 4.5, pefile 2024.8.26 and PyInstaller 6.20.0.
+The reviewed Nitrate 3.56 Qt installer extracted its AEX into Adobe MediaCore but left its runtime resources staged under FilmConvert/PremierePro. Its log reported completion without the relocation performed by its final GUI step. ProgramData/RubberMonkey was absent on the affected local installation.
 
-- 179 test methods executed: 178 passed, 1 optional test skipped.
-- The Windows one-file EXE built successfully using the included portable build specification.
-- Application modules were checked for unchanged executable syntax after removing explanatory comments and docstrings.
-- Update tests generate an isolated, temporary signing key. The publisher's private key is not required or included.
-- Source distribution excludes local logs, server code, publisher credentials, commercial plug-in archives and registration records.
+The app now completes this reviewed installation step in Python. It reads the vendor's Qt resource manifests, validates paths, installs the declared profiles/resources and vendor utilities in the machine's actual ProgramData folder, and verifies copied contents. Source files are preserved; interrupted file deployment rolls back. Existing license files are left unchanged. The vendor batch script and its broad permission changes are not executed.
 
-The test suite covers safe archive paths, file deployment, target discovery, installer handoff and queueing, registration-field handling, library organization, uninstall receipts and signed update validation. Native installer checks use controlled fixtures. These results do not certify every commercial installer, license or After Effects version.
+The fix runs after unattended setup, after a successfully completed manual Nitrate wizard, and on application startup when the reviewed installed resources are incomplete. Manual wizards are not reopened. AEX presence alone no longer satisfies the Nitrate installation check.
 
-`SHA256SUMS.txt` identifies the existing production EXE distributed with this release. Rebuilding with a different environment or build configuration can produce a different binary hash.
+## Validation
+
+- 198 regression test methods: 197 passed, 1 optional WinRAR archive-creation test skipped.
+- 19 FilmConvert tests cover manifests, custom installation locations, redirected ProgramData, missing/damaged files, idempotence, copy rollback, cancellation, manual completion and startup repair.
+- Repaired and verified 105 real installed support files.
+- In an isolated After Effects 2026 instance (26.5x89), FC NITRATE initialized successfully and rendered a one-frame 320 x 180 test composition. Output: 180,040-byte AVI.
+- The existing After Effects instance and its project were not closed or modified.
+
+These checks establish this installation fault and its repair. They do not guarantee compatibility with every GPU, driver, Windows build or legacy effect. Nitrate's graphics-runtime requirements still apply. Native success on one machine is separate from the portable-path and failure-case regression tests.

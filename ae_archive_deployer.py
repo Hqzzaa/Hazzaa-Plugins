@@ -48,6 +48,7 @@ from installer_workflow import execute_setup
 from installer_help import help_values,preserve_bcc_attachments,bcc_attachment_folder,ExtractionWorkspace
 from installer_support_ui import SetupHelpWindow
 from setup_dispatcher import SetupDispatcher
+from filmconvert_runtime import complete_runtime as complete_filmconvert_runtime, needs_repair as filmconvert_needs_repair
 
 try:
     import rarfile
@@ -440,6 +441,26 @@ class ArchiveDeployer:
         self._set_dark_titlebar()
         self._animate_snow()
         self._poll_events()
+        if getattr(sys, 'frozen', False):
+            self.root.after(300, self._repair_installed_support_files)
+
+    def _repair_installed_support_files(self):
+        if self.busy or self.setup_dispatcher.pending_count:
+            self.root.after(1000, self._repair_installed_support_files)
+            return
+        self.busy = True
+        def work():
+            repaired, error = False, None
+            try:
+                if filmconvert_needs_repair():
+                    self.events.put(('log', 'Repairing incomplete FilmConvert support files...'))
+                    complete_filmconvert_runtime(Path('Nitrate.PP-3.56b.exe'), install_binary,
+                        log=lambda message: self.events.put(('log', message)))
+                    repaired = True
+            except (OSError, ValueError, ET.ParseError) as problem:
+                error = str(problem)
+            self.events.put(('support_runtime_done', (repaired, error)))
+        threading.Thread(target=work, daemon=True).start()
 
     def _apply_cursor(self, widget: tk.Widget) -> None:
 
@@ -828,18 +849,20 @@ class ArchiveDeployer:
         digest=hashlib.sha256()
         for installer in installers:
             with installer.open('rb') as stream:digest.update(hashlib.file_digest(stream,'sha256').digest())
-        key=digest.hexdigest();current={'id':key,'name':installers[0].name}
+        key=digest.hexdigest();current={'id':key,'name':installers[0].name,'installer':installers[0]}
         def run():
             if runtime_plugins:ensure_prerequisites(runtime_plugins,lambda message:self.events.put(('log',message)),automatic=silent)
             unverified=assisted=0
             for installer in installers:
-                ident=key+':'+installer.name.casefold();current.update(id=ident,name=installer.name)
+                ident=key+':'+installer.name.casefold();current.update(id=ident,name=installer.name,installer=installer)
                 credentials=credentials_for_installer(documents,installer)
                 values=help_values(documents,credentials,installer)
                 def attention(phase,reason,ident=ident,name=installer.name,values=values):
                     self.events.put(('setup_help',{'id':ident,'name':name,'phase':phase,'reason':reason,
                         'product':product_name,'values':values,'attachments':str(attachments) if attachments else None}))
                 def verify(installer=installer):
+                    complete_filmconvert_runtime(installer, install_binary,
+                        log=lambda message: self.events.put(('log', message)))
                     return (complete_bcc12(extracted,installer,install_binary,shared_target),
                         verify_rsmb5_outputs(installer,shared_target),verify_known_setup_outputs(installer,shared_target))
                 outcome,evidence=execute_setup(installer,silent=silent,credentials=credentials,
@@ -860,7 +883,16 @@ class ArchiveDeployer:
             if error is not None:
                 self.events.put(('log','SETUP STOPPED: '+current['name']+': '+str(error)))
                 self.events.put(('setup_finished',(current['id'],False,str(error))))
-            elif getattr(outcome,'handed_off',False):self.events.put(('setup_manual_closed',current['id']))
+            elif getattr(outcome,'handed_off',False):
+                if current['name'].casefold() == 'nitrate.pp-3.56b.exe' and getattr(getattr(outcome,'process',None),'returncode',None) == 0:
+                    try:
+                        complete_filmconvert_runtime(current['installer'], install_binary,
+                            log=lambda message: self.events.put(('log', message)))
+                    except (OSError,ValueError,ET.ParseError) as problem:
+                        self.events.put(('log','FILMCONVERT SUPPORT FILES INCOMPLETE: '+str(problem)))
+                        self.events.put(('setup_finished',(current['id'],False,str(problem))))
+                        return
+                self.events.put(('setup_manual_closed',current['id']))
             if attachments:
                 library=bcc_library_directory()
                 if library:self.events.put(('included_files',str(library)))
@@ -1122,6 +1154,15 @@ class ArchiveDeployer:
                         self.activation_window.update_records()
                 elif kind == "credentials_help":
                     self._show_credentials_help(*payload)
+                elif kind == 'support_runtime_done':
+                    self.busy = False
+                    repaired, error = payload
+                    if error:
+                        self._log('FILMCONVERT SUPPORT CHECK FAILED: ' + error)
+                        self.archive_label.configure(text='FILMCONVERT SUPPORT FILES NEED ATTENTION - COPY LOG')
+                    elif repaired:
+                        self._log('FilmConvert resources repaired. Restart After Effects before testing Nitrate.')
+                        self.archive_label.configure(text='FILMCONVERT RESOURCES REPAIRED - RESTART AFTER EFFECTS')
                 elif kind == "preset_done":
                     self.busy = self.preset_scan_running = False
                     self.preset_button.configure(text="COLLECT USER PRESETS")
