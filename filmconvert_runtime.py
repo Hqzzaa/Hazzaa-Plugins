@@ -51,6 +51,21 @@ def runtime_destination():
     return Path(os.environ.get('ProgramData', r'C:\ProgramData')) / 'RubberMonkey'
 
 
+def reusable_installation(installer, shared_root):
+    if Path(installer).name.casefold() != INSTALLER or find_installation() is None:
+        return False
+    host = Path(shared_root) / 'FilmConvertNitrate.aex'
+    if not host.is_file():
+        return False
+    _no_links(host)
+    from deployment_plan import validate_plugin
+    try:
+        validate_plugin(host)
+    except (OSError, ValueError):
+        return False
+    return True
+
+
 def _candidates():
     candidates = []
     if os.name == 'nt':

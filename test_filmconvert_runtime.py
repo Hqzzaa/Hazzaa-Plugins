@@ -55,6 +55,60 @@ class FilmConvertRuntimeTests(unittest.TestCase):
     def test_actual_qt_big_endian_manifest_format(self):
         self.assertEqual(read_qt_manifest(self.metadata / '3.56Profiles.txt'), self.groups['Profiles'])
 
+    def test_repeat_auto_install_repairs_existing_version_without_any_setup_process(self):
+        from test_support import plugin_bytes
+        shared = self.root / 'Custom Adobe/MediaCore'
+        shared.mkdir(parents=True)
+        (shared / 'FilmConvertNitrate.aex').write_bytes(plugin_bytes())
+        installer = self.root / INSTALLER
+        installer.write_bytes(b'not launched')
+        app = object.__new__(ArchiveDeployer)
+        app.events = Queue()
+        _, run, _ = app._prepare_setup_package([installer], self.root, shared,
+            [], None, Mock(), True, 'Nitrate')
+        with patch('filmconvert_runtime._candidates', return_value=[self.vendor]), \
+             patch.dict(os.environ, {'ProgramData': str(self.data.parent)}), \
+             patch('ae_archive_deployer.execute_setup') as execute, \
+             patch('ae_archive_deployer.run_installer') as runner:
+            for attempt in range(3):
+                outcome, evidence = run()
+                self.assertEqual(int(outcome), 0)
+                self.assertEqual(evidence['unverified'], 0)
+            execute.assert_not_called()
+            runner.assert_not_called()
+        self.assertTrue((self.data / 'ResourcesNITRATE/fcl.bin').is_file())
+        self.assertFalse(any(kind == 'setup_help' for kind, _ in app.events.queue))
+
+    def test_existing_version_detection_requires_valid_host_and_reviewed_version(self):
+        from filmconvert_runtime import reusable_installation
+        from test_support import plugin_bytes
+        shared = self.root / 'Shared'
+        shared.mkdir()
+        host = shared / 'FilmConvertNitrate.aex'
+        with patch('filmconvert_runtime._candidates', return_value=[self.vendor]):
+            self.assertFalse(reusable_installation(Path(INSTALLER), shared))
+            host.write_bytes(b'incomplete')
+            self.assertFalse(reusable_installation(Path(INSTALLER), shared))
+            host.write_bytes(plugin_bytes())
+            self.assertTrue(reusable_installation(Path(INSTALLER), shared))
+            self.assertFalse(reusable_installation(Path('different.exe'), shared))
+            (self.vendor / 'components.xml').write_text('<Packages/>')
+            self.assertFalse(reusable_installation(Path(INSTALLER), shared))
+
+    def test_repeat_install_repair_error_never_opens_another_wizard(self):
+        app = object.__new__(ArchiveDeployer)
+        app.events = Queue()
+        installer = self.root / INSTALLER
+        installer.write_bytes(b'fixture')
+        _, run, _ = app._prepare_setup_package([installer], self.root, self.root / 'Shared',
+            [], None, Mock(), True, 'Nitrate')
+        with patch('ae_archive_deployer.reusable_filmconvert_installation', return_value=True), \
+             patch('ae_archive_deployer.complete_filmconvert_runtime', side_effect=PermissionError('Denied')), \
+             patch('ae_archive_deployer.execute_setup') as execute:
+            with self.assertRaises(PermissionError):
+                run()
+            execute.assert_not_called()
+
     def test_unattended_install_finalizes_profiles_resources_and_utilities(self):
         self.assertTrue(needs_repair(self.vendor, self.data))
         paths = self.complete()

@@ -49,6 +49,7 @@ from installer_help import help_values,preserve_bcc_attachments,bcc_attachment_f
 from installer_support_ui import SetupHelpWindow
 from setup_dispatcher import SetupDispatcher
 from filmconvert_runtime import complete_runtime as complete_filmconvert_runtime, needs_repair as filmconvert_needs_repair
+from filmconvert_runtime import reusable_installation as reusable_filmconvert_installation
 
 try:
     import rarfile
@@ -865,8 +866,13 @@ class ArchiveDeployer:
                         log=lambda message: self.events.put(('log', message)))
                     return (complete_bcc12(extracted,installer,install_binary,shared_target),
                         verify_rsmb5_outputs(installer,shared_target),verify_known_setup_outputs(installer,shared_target))
-                outcome,evidence=execute_setup(installer,silent=silent,credentials=credentials,
-                    log=lambda message:self.events.put(('log',message)),attention=attention,verify=verify,runner=run_installer)
+                if silent and reusable_filmconvert_installation(installer,shared_target):
+                    self.events.put(('log','Nitrate 3.56 is already installed. Automatically repairing and verifying its files; no setup wizard is needed.'))
+                    evidence=verify()
+                    outcome=InstallerExit(0)
+                else:
+                    outcome,evidence=execute_setup(installer,silent=silent,credentials=credentials,
+                        log=lambda message:self.events.put(('log',message)),attention=attention,verify=verify,runner=run_installer)
                 if getattr(outcome,'handed_off',False):
                     self.events.put(('setup_handed_off',ident))
                     return outcome,None
