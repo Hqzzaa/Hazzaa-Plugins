@@ -32,6 +32,7 @@ def main():
     output = Path(sys.argv[1])
     unknown = "--unknown" in sys.argv
     progress_only = '--progress-only' in sys.argv
+    transient_status = '--transient-status' in sys.argv
     bcc_license = '--bcc-license' in sys.argv
     children, fields, result = [], {}, {}
 
@@ -84,7 +85,7 @@ def main():
                 output.write_text(json.dumps(result), encoding="utf-8")
                 user.DestroyWindow(hwnd)
                 return 0
-        if message == 0x0113 and progress_only:
+        if message == 0x0113 and (progress_only or transient_status):
             output.write_text(json.dumps({'installed':True}),encoding='utf-8')
             user.DestroyWindow(hwnd);return 0
         if message == 0x0002:
@@ -100,7 +101,11 @@ def main():
                                  80, 80, 520, 360, None, None, instance, None)
     if not window:
         raise ctypes.WinError(ctypes.get_last_error())
-    if progress_only:
+    if transient_status:
+        create(window,'STATIC','Finishing installation',20,40,420)
+        user.SetTimer.argtypes=(wintypes.HWND,ctypes.c_size_t,wintypes.UINT,ctypes.c_void_p)
+        user.SetTimer(window,1,900,None)
+    elif progress_only:
         ctypes.WinDLL('comctl32').InitCommonControls()
         create(window,'STATIC','Installing files...',20,20,300)
         bar=create(window,'msctls_progress32','',20,80,420)

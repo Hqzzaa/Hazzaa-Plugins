@@ -49,7 +49,7 @@ class SetupHelpWindow:
                 self.app._button(row,'COPY',lambda v=value:self.copy(v)).pack(side='right',padx=(8,0))
         if payload.get('attachments'):self.files_button.pack(side='left')
         else:self.files_button.pack_forget()
-        if 'continuum' in payload['name'].casefold():
+        if payload['name'].casefold()=='continuum_2019_adobe_12_0_0_windows.exe':
             self.lib_button.pack(side='left',padx=6);self.browse_button.pack(side='left')
         else:self.lib_button.pack_forget();self.browse_button.pack_forget()
         self.status.configure(text='COMPLETE THE OPEN SETUP WINDOW')

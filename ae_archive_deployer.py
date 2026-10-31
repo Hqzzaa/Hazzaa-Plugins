@@ -41,6 +41,7 @@ from installer_runner import run_installer
 from runtime_dependencies import ensure_prerequisites,missing_runtime_files,VC14_NAMES
 from installer_runner import InstallerExit
 from update_ui import UpdateController
+from control_ui import ControlController
 from app_updater import helper_main, acknowledge_update
 from installed_products import DeploymentStore, record_deployment
 from uninstall_ui import UninstallWindow
@@ -442,10 +443,18 @@ class ArchiveDeployer:
         self._set_dark_titlebar()
         self._animate_snow()
         self._poll_events()
+        self.control = ControlController(self) if getattr(sys,'frozen',False) else None
         if getattr(sys, 'frozen', False):
             self.root.after(300, self._repair_installed_support_files)
 
+    def _operation_allowed(self):
+        control=getattr(self,'control',None)
+        return control is None or not control.blocked
+
     def _repair_installed_support_files(self):
+        if not self._operation_allowed():
+            self.root.after(1000,self._repair_installed_support_files)
+            return
         if self.busy or self.setup_dispatcher.pending_count:
             self.root.after(1000, self._repair_installed_support_files)
             return
@@ -477,6 +486,7 @@ class ArchiveDeployer:
 
     def _cleanup_jobs(self, event):
         if event.widget is self.root:
+            if getattr(self,'control',None):self.control.cleanup()
             if hasattr(self,'setup_dispatcher'):self.setup_dispatcher.close()
             for job in (self._snow_job, self._events_job):
                 if job is not None:
@@ -633,6 +643,7 @@ class ArchiveDeployer:
 
     def open_splash_customizer(self) -> None:
 
+        if not self._operation_allowed():return
         version = self.version_var.get()
         plugin_path = self.version_paths.get(version)
         if not plugin_path:
@@ -651,12 +662,14 @@ class ArchiveDeployer:
             messagebox.showerror("Splash image unavailable", str(error))
 
     def browse_target(self) -> None:
+        if not self._operation_allowed():return
         selected = filedialog.askdirectory(title="Select Plug-ins Target Folder", mustexist=True)
         if selected:
             self.target_path = Path(selected)
             self.target_var.set(selected)
 
     def collect_user_presets(self) -> None:
+        if not self._operation_allowed():return
         if self.preset_scan_running:
             self.preset_cancel.set()
             return
@@ -692,6 +705,7 @@ class ArchiveDeployer:
             self.events.put(("preset_done", None))
 
     def restore_script_registry(self) -> None:
+        if not self._operation_allowed():return
         if self.busy:
             return
         directory = registry_backup_directory()
@@ -706,6 +720,7 @@ class ArchiveDeployer:
                 messagebox.showerror("Registry restore", str(error), parent=self.root)
 
     def select_archives(self) -> None:
+        if not self._operation_allowed():return
         if self.busy:
             return
         selected = filedialog.askopenfilenames(title="Select Archive Files",
@@ -762,6 +777,7 @@ class ArchiveDeployer:
         return True
 
     def process_archives(self) -> None:
+        if not self._operation_allowed():return
         if self.busy:
             return
         if not self.archives:
@@ -781,6 +797,7 @@ class ArchiveDeployer:
         worker.start()
 
     def open_library(self):
+        if not self._operation_allowed():return
         if self.downloading:
             self.download_cancel.set()
             self.library_button.configure(text="CANCELLING...")
@@ -791,6 +808,7 @@ class ArchiveDeployer:
         self.library_window = LibraryWindow(self)
 
     def open_uninstall(self):
+        if not self._operation_allowed():return
         if self.uninstall_window is not None and self.uninstall_window.root.winfo_exists():
             self.uninstall_window.root.lift();return
         import json
@@ -800,6 +818,7 @@ class ArchiveDeployer:
         self.uninstall_window=UninstallWindow(self,index)
 
     def start_library_install(self, items):
+        if not self._operation_allowed():return
         if self.busy:
             messagebox.showinfo("Operation running", "Wait for the current operation to finish.", parent=self.root)
             return False
@@ -852,6 +871,7 @@ class ArchiveDeployer:
             with installer.open('rb') as stream:digest.update(hashlib.file_digest(stream,'sha256').digest())
         key=digest.hexdigest();current={'id':key,'name':installers[0].name,'installer':installers[0]}
         def run():
+            if not self._operation_allowed():raise RuntimeError('Application disabled by the owner. No new installer was started.')
             if runtime_plugins:ensure_prerequisites(runtime_plugins,lambda message:self.events.put(('log',message)),automatic=silent)
             unverified=assisted=0
             for installer in installers:
@@ -918,6 +938,10 @@ class ArchiveDeployer:
         self.events.put(('log','Selected Plug-ins: '+str(target)))
         self.events.put(('log','Adobe shared MediaCore: '+str(shared_target)))
         for index, archive_path in enumerate(archives, 1):
+            if not self._operation_allowed():
+                failures+=1
+                self.events.put(('log','Application disabled by the owner. Remaining items were not started.'))
+                break
             self.events.put(("log", f"Processing {archive_path.name}..."))
             try:
                 workspace=ExtractionWorkspace()
@@ -1101,7 +1125,9 @@ class ArchiveDeployer:
         try:
             while True:
                 kind, payload = self.events.get_nowait()
-                if kind.startswith('update_'):
+                if kind=='control_checked':
+                    self.control.receive(payload)
+                elif kind.startswith('update_'):
                     self.updater.handle(kind, payload)
                     if getattr(self,'_update_exiting',False):
                         return

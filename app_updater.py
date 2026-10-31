@@ -31,12 +31,13 @@ def version_tuple(value):
     return tuple(map(int, value.split('.')))
 
 
-def _verify_signature(data: bytes, signature: bytes):
+def _verify_signature(data: bytes, signature: bytes, modulus_b64=None, exponent_value=None):
 
     if os.name != 'nt':
         raise OSError('Windows is required to verify app updates.')
-    modulus = base64.b64decode(MODULUS_B64, validate=True)
-    exponent = EXPONENT.to_bytes((EXPONENT.bit_length()+7)//8, 'big')
+    modulus = base64.b64decode(MODULUS_B64 if modulus_b64 is None else modulus_b64, validate=True)
+    number = EXPONENT if exponent_value is None else exponent_value
+    exponent = number.to_bytes((number.bit_length()+7)//8, 'big')
     if len(signature) != len(modulus):
         raise ValueError('Invalid update signature.')
     blob = struct.pack('<6I', 0x31415352, len(modulus)*8, len(exponent), len(modulus), 0, 0)+exponent+modulus

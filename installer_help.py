@@ -70,9 +70,12 @@ def setup_steps(name,reason=''):
         steps=['1. Product rows already filled? Click Next.',
                '2. Otherwise paste your serial, click Submit, then Next.',
                '3. Click Install, then Finish.']
-    elif 'continuum' in name:
+    elif name=='continuum_2019_adobe_12_0_0_windows.exe':
         steps=['1. Choose Complete installation without entering a license, then Next.',
                '2. Finish Setup. OPEN FILES and OPEN LIB show the two folders.']
+    elif 'continuum' in name:
+        steps=['Complete this installer only if you selected manual installation.',
+               'This package installs its own files. No external file copying is required.']
     elif 'sapphire' in name:
         steps=['1. Complete Setup: Next > Install > Finish.',
                '2. Restart After Effects when Setup finishes.']

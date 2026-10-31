@@ -35,6 +35,7 @@ SPEC.loader.exec_module(APP)
 
 class WorkerHarness:
 
+    _operation_allowed = APP.ArchiveDeployer._operation_allowed
 
     def __init__(self, approve_installers: bool = True) -> None:
         self.events = Queue()

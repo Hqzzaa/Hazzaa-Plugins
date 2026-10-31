@@ -33,3 +33,11 @@ def requires_input(forms,window):
     has_progress=any('progress' in c.class_name.casefold() for c in controls)
 
     return not has_progress and not buttons
+
+
+def input_grace(forms,window):
+    controls=forms.controls(window)
+    if any(c.is_edit or ('button' in c.class_name.casefold() and
+            normalized_label(c.text) not in {'cancel','back','help','hide','minimize',''}) for c in controls):
+        return 2
+    return 8

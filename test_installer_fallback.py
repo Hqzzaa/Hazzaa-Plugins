@@ -19,6 +19,61 @@ ROOT=Path(__file__).resolve().parent
 
 
 class InstallerFallbackTests(unittest.TestCase):
+    def test_native_transient_status_is_not_handed_off_as_a_manual_wizard(self):
+        with tempfile.TemporaryDirectory() as temp:
+            output=Path(temp)/'status.json';attention=Mock()
+            result=run_installer([sys.executable,str(ROOT/'native_installer_fixture.py'),str(output),'--transient-status'],Path(temp),
+                silent=True,credentials={},log=lambda _:None,on_attention=attention,handoff_on_attention=True,timeout=8)
+            self.assertEqual(result,0);self.assertFalse(result.assisted)
+            self.assertFalse(getattr(result,'handed_off',False));attention.assert_not_called()
+    def test_continuum_2026_parent_success_with_helper_codes_is_verified_once(self):
+        with tempfile.TemporaryDirectory() as temp:
+            installer=Path(temp)/'BorisFX Continuum 2026.5 Adobe v19.5.6.exe'
+            installer.write_bytes(b'Inno Setup')
+            runner=Mock(return_value=InstallerExit(2,False,[2,2],parent_code=0))
+            verify=Mock(return_value=['host.aex']);attention=Mock()
+            outcome,evidence=execute_setup(installer,silent=True,credentials={},log=lambda _:None,
+                attention=attention,verify=verify,runner=runner)
+            self.assertEqual(outcome,0);self.assertEqual(outcome.parent_code,0)
+            self.assertFalse(outcome.assisted);self.assertEqual(evidence,['host.aex'])
+            runner.assert_called_once();verify.assert_called_once();attention.assert_not_called()
+
+    def test_continuum_2026_errors_never_open_a_normal_installer(self):
+        with tempfile.TemporaryDirectory() as temp:
+            installer=Path(temp)/'BorisFX Continuum 2026.5 Adobe v19.5.6.exe'
+            installer.write_bytes(b'Inno Setup')
+            for result in [InstallerExit(2,False,[2],parent_code=2),
+                           InstallerExit(1603,False,[2,1603],parent_code=0),1602,5]:
+                with self.subTest(code=int(result)):
+                    runner=Mock(return_value=result);attention=Mock();verify=Mock()
+                    with self.assertRaises(RuntimeError):
+                        execute_setup(installer,silent=True,credentials={},log=lambda _:None,
+                            attention=attention,verify=verify,runner=runner)
+                    runner.assert_called_once();attention.assert_not_called();verify.assert_not_called()
+
+    def test_continuum_2026_missing_host_files_fail_without_a_manual_retry(self):
+        with tempfile.TemporaryDirectory() as temp:
+            installer=Path(temp)/'BorisFX Continuum 2026.5 Adobe v19.5.6.exe'
+            installer.write_bytes(b'Inno Setup')
+            runner=Mock(return_value=InstallerExit(2,False,[2],parent_code=0))
+            attention=Mock();verify=Mock(side_effect=OSError('Missing files'))
+            with self.assertRaises(OSError):
+                execute_setup(installer,silent=True,credentials={},log=lambda _:None,
+                    attention=attention,verify=verify,runner=runner)
+            runner.assert_called_once();attention.assert_not_called();verify.assert_called_once()
+
+    def test_continuum_2026_has_no_legacy_copy_instructions_or_lib_buttons(self):
+        name='BorisFX Continuum 2026.5 Adobe v19.5.6.exe'
+        self.assertNotIn('OPEN LIB',setup_steps(name))
+        self.assertNotIn('without entering a license',setup_steps(name))
+        root=tk.Tk();self.addCleanup(root.destroy)
+        with patch('ae_archive_deployer.ActivationStore') as store:
+            store.return_value.records.return_value=[];app=ArchiveDeployer(root)
+        from installer_support_ui import SetupHelpWindow
+        window=SetupHelpWindow(app,{'name':name,'reason':'Manual installation selected','values':{}})
+        self.assertEqual(window.lib_button.winfo_manager(),'')
+        self.assertEqual(window.browse_button.winfo_manager(),'')
+
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.folder=Path(self.temp.name)

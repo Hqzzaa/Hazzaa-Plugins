@@ -74,9 +74,10 @@ class Job:
 
 class InstallerExit(int):
 
-    def __new__(cls,code,assisted=False,child_codes=()):
+    def __new__(cls,code,assisted=False,child_codes=(),parent_code=None):
         value=super().__new__(cls,code)
         value.assisted=assisted;value.child_codes=tuple(child_codes)
+        value.parent_code=int(code if parent_code is None else parent_code)
         return value
 
 
@@ -123,6 +124,7 @@ def run_installer(command, directory, *, silent, credentials, log, timeout=1800,
         child_handles = {}
         child_images = {}
         visible_since = None
+        visible_group = ()
         needed_ui = False
         transferred=False
         automated_pages=set()
@@ -131,7 +133,8 @@ def run_installer(command, directory, *, silent, credentials, log, timeout=1800,
             try:
                 from installer_automation import InstallerAssistant, Credentials
                 values = credentials if isinstance(credentials,dict) else getattr(credentials,'values',{})
-                assistant=InstallerAssistant(process.pid,Credentials(values or {}),log,allow_advance=False)
+                if values and any(values.values()):
+                    assistant=InstallerAssistant(process.pid,Credentials(values),log,allow_advance=False)
             except OSError:
                 log('Installer form entry is unavailable; manual fields remain visible.')
         child_codes=[]
@@ -168,22 +171,26 @@ def run_installer(command, directory, *, silent, credentials, log, timeout=1800,
                         tracked.update(children)
                         parents = children
                     windows = forms.windows(tracked & snapshot.keys())
-                    from installer_interaction import advance_bcc_license_page,requires_input
+                    from installer_interaction import advance_bcc_license_page,requires_input,input_grace
                     advanced=False
                     if handoff_on_attention:
                         for window in windows:
                             if advance_bcc_license_page(forms,window,automated_pages):
                                 advanced=True
                                 log('Boris: selected installation without a license and clicked Next. This does not activate the product.')
-                    visible=not advanced and any(requires_input(forms,window) for window in windows)
+                    required=tuple(window for window in windows if not advanced and requires_input(forms,window))
+                    visible=bool(required)
                     if assistant is not None and not needed_ui:
                         try:assistant.poll()
                         except Exception:
                             assistant=None
                             log('Installer field entry stopped; complete the visible fields manually.')
                     if visible:
-                        visible_since = visible_since or time.monotonic()
-                        if not needed_ui and time.monotonic() - visible_since >= (0 if handoff_on_attention else 2):
+                        if required!=visible_group:
+                            visible_since=time.monotonic()
+                            visible_group=required
+                        grace=min(input_grace(forms,window) for window in required)
+                        if not needed_ui and time.monotonic() - visible_since >= grace:
                             needed_ui = True
                             log('SETUP NEEDS ATTENTION: this installer displayed a window despite its silent flags.')
                             if on_attention is not None:
@@ -199,8 +206,9 @@ def run_installer(command, directory, *, silent, credentials, log, timeout=1800,
                                 log('ASSISTED INSTALL: waiting for the existing wizard to finish.')
                     else:
                         visible_since = None
+                        visible_group = ()
                 time.sleep(.1)
-            code = process.wait()
+            parent_code = code = process.wait()
             for pid, handle in child_handles.items():
                 child_code = wintypes.DWORD()
                 if job.kernel.GetExitCodeProcess(handle, ctypes.byref(child_code)) and child_code.value not in (0,1641,3010):
@@ -235,4 +243,4 @@ def run_installer(command, directory, *, silent, credentials, log, timeout=1800,
                 log('Setup error: '+message.strip())
         if needed_ui and on_attention is None:
             raise RuntimeError('Unattended setup was not achieved. Review the visible installer; no silent-success status was recorded.')
-        return InstallerExit(code,needed_ui,child_codes)
+        return InstallerExit(code,needed_ui,child_codes,parent_code=parent_code)

@@ -73,3 +73,7 @@ The application verifies signed update manifests and checks downloaded file size
 ## License
 
 Application code: [MIT](LICENSE), © 2026 HAZZAA. Third-party dependencies retain their respective licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Availability
+
+The publisher can pause and restore application availability. The app checks a signed status at launch and while open. Offline clients retain their last verified state. Running installations finish safely before new work is blocked. Continuum 2026.5 installs in the background; additional file copying is not required.
