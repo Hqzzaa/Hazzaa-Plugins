@@ -14,6 +14,38 @@ from product_deployment import complete_bcc12,BCC_LIBRARIES,verify_rsmb5_outputs
 
 
 class ProductDeploymentTests(unittest.TestCase):
+    def test_continuum_expected_helper_failure_is_narrowly_scoped(self):
+        from installer_runner import expected_helper_exit
+        installer=Path('BorisFX Continuum 2026.5 Adobe v19.5.6.exe')
+        helper=Path(os.environ.get('SystemRoot',r'C:\Windows'))/'System32/net.exe'
+        self.assertTrue(expected_helper_exit([str(installer)],str(helper),2))
+        for command,image,code in [(['other.exe'],str(helper),2),
+                                   ([str(installer)],str(helper),5),
+                                   ([str(installer)],str(helper.with_name('msiexec.exe')),2),
+                                   ([str(installer)],str(Path('untrusted/net.exe')),2),
+                                   ([str(installer)],None,2)]:
+            self.assertFalse(expected_helper_exit(command,image,code))
+
+    def test_continuum_2026_verifies_its_actual_shared_host_directory(self):
+        from product_deployment import verify_known_setup_outputs
+        with tempfile.TemporaryDirectory() as temp:
+            shared=Path(temp)/'Custom Adobe/MediaCore'
+            host=shared/'BorisFX/Continuum/BCCFastFilmGlow.aex'
+            host.parent.mkdir(parents=True)
+            host.write_bytes(plugin_bytes())
+            installer=Path('BorisFX Continuum 2026.5 Adobe v19.5.6.exe')
+            self.assertEqual(verify_known_setup_outputs(installer,shared),[host])
+
+    def test_continuum_2026_does_not_accept_legacy_host_files_as_new_installation(self):
+        from product_deployment import verify_known_setup_outputs
+        with tempfile.TemporaryDirectory() as temp:
+            shared=Path(temp)
+            old=shared/'Continuum Plug-ins/BCCFastFilmGlow.aex'
+            old.parent.mkdir()
+            old.write_bytes(plugin_bytes())
+            with self.assertRaisesRegex(OSError,'expected Adobe host files are missing'):
+                verify_known_setup_outputs(Path('BorisFX Continuum 2026.5 Adobe v19.5.6.exe'),shared)
+
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)

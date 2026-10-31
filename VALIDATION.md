@@ -1,22 +1,20 @@
-# Hazzaa Plugins 2026.10.30.2
+# Hazzaa Plugins 2026.10.30.3
 
-## FilmConvert Nitrate fix
+## Continuum 2026.5
 
-The reviewed Nitrate 3.56 Qt installer extracted its AEX into Adobe MediaCore but left its runtime resources staged under FilmConvert/PremierePro. Its log reported completion without the relocation performed by its final GUI step. ProgramData/RubberMonkey was absent on the affected local installation.
+The online library replaces the legacy BCC/Continuum package with Continuum 2026.5 Adobe 19.5.6. Sapphire remains unchanged. The download is a ZIP containing only the supplied installer, without the outer archive password or website shortcuts.
 
-The app now completes this reviewed installation step in Python. It reads the vendor's Qt resource manifests, validates paths, installs the declared profiles/resources and vendor utilities in the machine's actual ProgramData folder, and verifies copied contents. Source files are preserved; interrupted file deployment rolls back. Existing license files are left unchanged. The vendor batch script and its broad permission changes are not executed.
+The application uses Inno Setup's unattended switches: /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-. Native administrator-mode installation completed in 188.26 seconds with exit code 0, no assistance callback, no manual handoff and no wizard input. Windows administrator consent is separate from the installer's unattended mode.
 
-The fix runs after unattended setup, after a successfully completed manual Nitrate wizard, and on application startup when the reviewed installed resources are incomplete. Manual wizards are not reopened. AEX presence alone no longer satisfies the Nitrate installation check.
-
-The 2026.10.30.2 fix also detects an existing reviewed 3.56 installation before launching setup. Its valid x64 host file is checked, support files are repaired and verified, and AUTO INSTALL completes without another installer process or assistance window. This avoids Qt IFW's TargetDirectoryInUse error when installing the same version again. First-time setup keeps the original unattended command. Unknown versions and missing/invalid host binaries are not treated as completed installations.
+Verified 496 installed Windows x64 AEX files in Adobe's shared MediaCore/BorisFX/Continuum directory. The installer also populated its version 19 vendor runtime folder and resource/model folders. The new postcondition checks the current host directory; old Continuum host files alone cannot satisfy it. An explicitly reviewed system net.exe helper exit code does not override an otherwise successful parent installer; unrelated executables and errors remain failures.
 
 ## Validation
 
-- 201 regression test methods: 200 passed, 1 optional WinRAR archive-creation test skipped.
-- 22 FilmConvert tests cover manifests, custom installation locations, redirected ProgramData, missing/damaged files, idempotence, copy rollback, cancellation, manual completion, startup repair and repeat installation without launching setup.
-- The actual installed Nitrate package completed the application's repeat-install flow with zero setup processes, zero manual assistance windows and all 105 support files verified.
-- Repaired and verified 105 real installed support files.
-- In an isolated After Effects 2026 instance (26.5x89), FC NITRATE initialized successfully and rendered a one-frame 320 x 180 test composition. Output: 180,040-byte AVI.
-- The existing After Effects instance and its project were not closed or modified.
+- 204 regression test methods: 203 passed, 1 optional WinRAR test skipped.
+- The sanitized public source passed the same 204 tests.
+- 4 server tests, including successful multipart completion at 429 and 1280 parts, invalid lists and bounded payload rejection.
+- The packaged executable matches all 26 reviewed application modules and its assets.
+- The isolated updater replaced a locked prior QA executable and obtained a real Tk startup receipt for version 2026.10.30.3.
+- Existing Nitrate automatic installation/repair behavior is retained.
 
-These checks establish this installation fault and its repair. They do not guarantee compatibility with every GPU, driver, Windows build or legacy effect. Nitrate's graphics-runtime requirements still apply. Native success on one machine is separate from the portable-path and failure-case regression tests.
+The installer and host files were checked on this Windows machine. GPU compatibility and every individual Continuum effect were not exhaustively tested. The optional separate After Effects render check was not completed because native app inspection approval timed out; it is not counted as a passed test. Existing user projects were not closed or changed.

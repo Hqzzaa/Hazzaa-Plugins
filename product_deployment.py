@@ -146,6 +146,8 @@ def verify_known_setup_outputs(installer,shared_root=None):
         outputs=list((shared/'Sapphire Plug-ins').rglob('*.aex'))
     elif name=='bao plugins bundle 2025.5.exe':
         outputs=list((shared/'BAO').rglob('*.aex'))
+    elif name=='borisfx continuum 2026.5 adobe v19.5.6.exe':
+        outputs=list((shared/'BorisFX/Continuum').rglob('*.aex'))
     elif name=='nitrate.pp-3.56b.exe':
         outputs=[p for p in shared.rglob('*.aex') if 'nitrate' in str(p.relative_to(shared)).casefold()]
         from filmconvert_runtime import runtime_plan

@@ -8,6 +8,14 @@ import time
 from ctypes import wintypes
 
 
+def expected_helper_exit(command, image, code):
+    return (code == 2 and os.path.basename(command[0]).casefold() ==
+            'borisfx continuum 2026.5 adobe v19.5.6.exe' and
+            os.path.normcase(os.path.abspath(image or '.')) in
+            {os.path.normcase(os.path.join(os.environ.get('SystemRoot', r'C:\Windows'), folder, 'net.exe'))
+             for folder in ('System32','SysWOW64')})
+
+
 class Job:
 
     def __init__(self, process):
@@ -23,6 +31,7 @@ class Job:
         self.kernel.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
         self.kernel.OpenProcess.restype = wintypes.HANDLE
         self.kernel.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+        self.kernel.QueryFullProcessImageNameW.argtypes = (wintypes.HANDLE,wintypes.DWORD,wintypes.LPWSTR,ctypes.POINTER(wintypes.DWORD))
         self.kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
         handle = self.kernel.CreateJobObjectW(None, None)
         if handle and self.kernel.AssignProcessToJobObject(handle, int(process._handle)):
@@ -112,6 +121,7 @@ def run_installer(command, directory, *, silent, credentials, log, timeout=1800,
             forms = WindowsForms()
         tracked = {process.pid}
         child_handles = {}
+        child_images = {}
         visible_since = None
         needed_ui = False
         transferred=False
@@ -138,6 +148,10 @@ def run_installer(command, directory, *, silent, credentials, log, timeout=1800,
                             handle = job.kernel.OpenProcess(0x1000, False, pid)
                             if handle:
                                 child_handles[pid] = handle
+                                image=ctypes.create_unicode_buffer(32768)
+                                length=wintypes.DWORD(len(image))
+                                if job.kernel.QueryFullProcessImageNameW(handle,0,image,ctypes.byref(length)):
+                                    child_images[pid]=image.value
                 if time.monotonic() > deadline:
                     job.terminate()
                     if process.poll() is None:
@@ -191,8 +205,10 @@ def run_installer(command, directory, *, silent, credentials, log, timeout=1800,
                 child_code = wintypes.DWORD()
                 if job.kernel.GetExitCodeProcess(handle, ctypes.byref(child_code)) and child_code.value not in (0,1641,3010):
                     child_codes.append(child_code.value)
-                    log(f'Setup child process exited with code {child_code.value}.')
-                    if code in (0,1641,3010):
+                    expected=expected_helper_exit(command,child_images.get(pid),child_code.value)
+                    identity=os.path.basename(child_images.get(pid,'')) or str(pid)
+                    log(f'{"Non-fatal setup helper" if expected else "Setup child process"} ({identity}) exited with code {child_code.value}.')
+                    if code in (0,1641,3010) and not expected:
                         code = child_code.value
         except Exception as error:
 

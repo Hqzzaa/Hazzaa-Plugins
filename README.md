@@ -18,6 +18,7 @@ Windows desktop tool for installing and organizing After Effects plug-ins, scrip
 - Customize the startup image with pan, zoom, multiline text, fonts and colors.
 - Download signed application updates with file verification and rollback.
 - Repair incomplete FilmConvert Nitrate 3.56 support resources after setup and on application startup.
+- Install Continuum 2026.5 and verify its current Adobe MediaCore location.
 
 ## Use
 
